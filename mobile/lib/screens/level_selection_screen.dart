@@ -18,27 +18,27 @@ class LevelSelectionScreen extends StatelessWidget {
 
     return Scaffold(
       body: GradientBackground(
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Header (Exact Figma Dimensions)
-              Container(
-                height: 63,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.85),
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(13),
-                    bottomRight: Radius.circular(13),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF1A3D7C).withValues(alpha: 0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+        child: Column(
+          children: [
+            // Header (Immersive)
+            Container(
+              padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.85),
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(13),
+                  bottomRight: Radius.circular(13),
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF1A3D7C).withValues(alpha: 0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: SizedBox(
+                height: 63,
                 child: Row(
                   children: [
                     IconButton(
@@ -46,6 +46,10 @@ class LevelSelectionScreen extends StatelessWidget {
                         'assets/icons/back_arrow.svg',
                         width: 22,
                         height: 22,
+                        colorFilter: const ColorFilter.mode(
+                          Color(0xFF1A3D7C),
+                          BlendMode.srcIn,
+                        ),
                       ),
                       onPressed: () => Navigator.pop(context),
                     ),
@@ -64,19 +68,19 @@ class LevelSelectionScreen extends StatelessWidget {
                   ],
                 ),
               ),
+            ),
 
-              // Level List
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 24),
-                  itemCount: levels.length,
-                  itemBuilder: (context, index) {
-                    return _buildLevelCard(context, levels[index], index);
-                  },
-                ),
+            // Level List
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 24),
+                itemCount: levels.length,
+                itemBuilder: (context, index) {
+                  return _buildLevelCard(context, levels[index], index);
+                },
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

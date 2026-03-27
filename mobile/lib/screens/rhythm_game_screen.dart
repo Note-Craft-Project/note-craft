@@ -563,30 +563,31 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Ticker
   Widget build(BuildContext context) {
     final bpm = ref.watch(bpmProvider);
     final inputType = ref.watch(inputTypeProvider);
+    final topPadding = MediaQuery.paddingOf(context).top;
 
     return Scaffold(
       body: GradientBackground(
-        child: SafeArea(
-          bottom: false,
-          child: Column(
-            children: [
-              // Header (White with rounded bottom corners)
-              Container(
-                height: 65,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(15),
-                    bottomRight: Radius.circular(15),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+        child: Column(
+          children: [
+            // Header (Immersive)
+            Container(
+              padding: EdgeInsets.only(top: topPadding),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.85),
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(15),
+                  bottomRight: Radius.circular(15),
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: SizedBox(
+                height: 65,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
@@ -596,6 +597,10 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Ticker
                           'assets/icons/back_arrow.svg',
                           width: 22,
                           height: 22,
+                          colorFilter: const ColorFilter.mode(
+                            Color(0xFF0E2576),
+                            BlendMode.srcIn,
+                          ),
                         ),
                         onPressed: () => Navigator.pop(context),
                       ),
@@ -615,162 +620,137 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Ticker
                   ),
                 ),
               ),
+            ),
 
-              const SizedBox(height: 20),
+            const SizedBox(height: 20),
 
-              // Controls Bar
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            // Controls Bar
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildBpmBadge(bpm),
+                  _buildInputToggle(inputType),
+                ],
+              ),
+            ),
+
+            // Main Gameplay Area
+            Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: (_gameState == GameState.playing && inputType == InputType.tap)
+                    ? _onInputTriggered
+                    : null,
+                child: Column(
                   children: [
-                    _buildBpmBadge(bpm),
-                    _buildInputToggle(inputType),
+                    // Feedback / Countdown
+                    SizedBox(
+                      height: 90,
+                      child: Center(
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 100),
+                          transitionBuilder: (child, animation) {
+                            return ScaleTransition(
+                              scale: CurvedAnimation(parent: animation, curve: Curves.elasticOut),
+                              child: FadeTransition(opacity: animation, child: child),
+                            );
+                          },
+                          child: _gameState == GameState.countdown
+                              ? SvgPicture.asset(
+                                  'assets/images/gameplay/${_countdownValue == 0 ? "START" : _countdownValue.toString()}.svg',
+                                  key: ValueKey('countdown_$_countdownValue'),
+                                  height: 60,
+                                )
+                              : (_feedbackText.isNotEmpty)
+                                  ? SvgPicture.asset(
+                                      'assets/images/gameplay/feedback/$_feedbackText.svg',
+                                      key: ValueKey('feedback_$_feedbackText'),
+                                      height: 50,
+                                    )
+                                  : const SizedBox.shrink(),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // Staff Area
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            height: 135,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF1A3D7C).withValues(alpha: 0.1),
+                                  blurRadius: 15,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                          ),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: SizedBox(
+                              height: 135,
+                              width: double.infinity,
+                              child: CustomPaint(painter: StaffLinesPainter()),
+                            ),
+                          ),
+                          Positioned.fill(
+                            child: CustomPaint(
+                              painter: NotesPainter(
+                                pattern: currentLevel.pattern,
+                                currentMeasure: (_currentBeatGlobal ~/ 4).clamp(0, (currentLevel.pattern.length - 1) ~/ 4),
+                              ),
+                            ),
+                          ),
+                          Positioned.fill(
+                            child: AnimatedBuilder(
+                              animation: _animationController,
+                              builder: (context, _) => CustomPaint(
+                                painter: PlayheadPainter(progress: _animationController.value),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Tap Area Hint
+                    Expanded(
+                      child: _gameState == GameState.playing
+                          ? _buildTapHint(inputType)
+                          : const SizedBox.shrink(),
+                    ),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
+            ),
 
-              // Expanded Tap Area for Gameplay
-              Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: (_gameState == GameState.playing && inputType == InputType.tap)
-                      ? _onInputTriggered
-                      : null,
-                  child: Column(
-                    children: [
-
-
-                      // FEEDBACK & COUNTDOWN AREA
-                      SizedBox(
-                        height: 90,
-                        child: Center(
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 100), // Much faster
-                            transitionBuilder: (child, animation) {
-                              return ScaleTransition(
-                                scale: CurvedAnimation(
-                                  parent: animation,
-                                  curve: Curves.elasticOut, // Snappy pop effect
-                                ),
-                                child: FadeTransition(
-                                  opacity: animation,
-                                  child: child,
-                                ),
-                              );
-                            },
-                            child: _gameState == GameState.countdown
-                                ? SvgPicture.asset(
-                                    'assets/images/gameplay/${_countdownValue == 0 ? "START" : _countdownValue.toString()}.svg',
-                                    key: ValueKey('countdown_$_countdownValue'),
-                                    height: 60,
-                                    fit: BoxFit.contain,
-                                  )
-                                : (_feedbackText.isNotEmpty)
-                                    ? SvgPicture.asset(
-                                        'assets/images/gameplay/feedback/$_feedbackText.svg',
-                                        key: ValueKey('feedback_$_feedbackText'),
-                                        height: 50,
-                                        fit: BoxFit.contain,
-                                      )
-                                    : const SizedBox.shrink(),
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 40),
-
-                      // Area: Staff Music
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          alignment: Alignment.center,
-                          children: [
-                            // 1. Staff Background Container
-                            Container(
-                              height: 135, // Increased for more space
-                              width: double.infinity,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(8),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFF1A3D7C).withValues(alpha: 0.1),
-                                    blurRadius: 15,
-                                    spreadRadius: 1,
-                                    offset: const Offset(0, 6),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            // 2. Staff Lines
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: SizedBox(
-                                height: 135,
-                                width: double.infinity,
-                                child: CustomPaint(
-                                  painter: StaffLinesPainter(),
-                                ),
-                              ),
-                            ),
-
-                            // 3. Notes Visualization
-                            Positioned.fill(
-                              child: CustomPaint(
-                                  painter: NotesPainter(
-                                    pattern: currentLevel.pattern,
-                                    currentMeasure: (_currentBeatGlobal ~/ 4).clamp(0, (currentLevel.pattern.length - 1) ~/ 4),
-                                  ),
-                              ),
-                            ),
-
-                            // 4. Playhead
-                            Positioned.fill(
-                              child: AnimatedBuilder(
-                                animation: _animationController,
-                                builder: (context, _) {
-                                  return CustomPaint(
-                                    painter: PlayheadPainter(
-                                      progress: _animationController.value,
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 20),
-                      // Reserved area for Tap Area Hint (Now Expanded to fill space)
-                      Expanded(
-                        child: _gameState == GameState.playing
-                            ? _buildTapHint(inputType)
-                            : const SizedBox.shrink(),
-                      ),
-                      const SizedBox(height: 20),
-                    ],
-                  ),
-                ),
+            // Play/Stop Button
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 32),
+              child: _build3DButton(
+                text: _gameState == GameState.playing || _gameState == GameState.countdown ? "Stop" : "Start",
+                onTap: _togglePlay,
+                height: 58,
+                fontSize: 18,
               ),
-
-              // Bottom Button
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 32),
-                child: _build3DButton(
-                  text: _gameState == GameState.playing || _gameState == GameState.countdown ? "Stop" : "Start",
-                  height: 58,
-                  fontSize: 18,
-                  onTap: () {
-                    _togglePlay();
-                  },
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
