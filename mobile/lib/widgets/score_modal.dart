@@ -57,7 +57,7 @@ class ScoreModal extends StatelessWidget {
                   style: GoogleFonts.titanOne(
                     fontSize: 80,
                     height: 1.0,
-                    color: const Color(0xFF1E3A8A).withOpacity(0.35),
+                    color: const Color(0xFF1E3A8A).withValues(alpha: 0.35),
                   ),
                 ),
                 // Main Score
@@ -131,7 +131,7 @@ class ScoreModal extends StatelessWidget {
         decoration: BoxDecoration(
           color: color,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF0E2576).withOpacity(0.1), width: 1.5),
+          border: Border.all(color: const Color(0xFF0E2576).withValues(alpha: 0.1), width: 1.5),
           boxShadow: [
             BoxShadow(
               color: shadowColor,

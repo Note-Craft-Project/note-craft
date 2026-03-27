@@ -335,7 +335,7 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
 
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.3),
+      barrierColor: Colors.black.withValues(alpha: 0.3),
       builder: (context) => Dialog(
         insetPadding: const EdgeInsets.symmetric(horizontal: 24),
         backgroundColor: Colors.transparent,
@@ -427,7 +427,7 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
                 "You can only choose between 60-80",
                 style: GoogleFonts.ubuntu(
                   fontSize: 11,
-                  color: const Color(0xFF7B9DFE).withOpacity(0.8),
+                  color: const Color(0xFF7B9DFE).withValues(alpha: 0.8),
                 ),
               ),
               const SizedBox(height: 24),
@@ -490,7 +490,7 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
   void _showCompletionDialog(int stars, int score) {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.4),
+      barrierColor: Colors.black.withValues(alpha: 0.4),
       barrierDismissible: false,
       builder: (context) => ScoreModal(
         score: score,
@@ -847,7 +847,7 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
           borderRadius: BorderRadius.circular(19),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF2E6FE9).withOpacity(0.15),
+              color: const Color(0xFF2E6FE9).withValues(alpha: 0.15),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),
@@ -956,7 +956,7 @@ class StaffLinesPainter extends CustomPainter {
     final double lineSpacing = innerHeight / (numLines - 1);
 
     final linePaint = Paint()
-      ..color = const Color(0xFFB0C4DE).withOpacity(0.6) // More visible
+      ..color = const Color(0xFFB0C4DE).withValues(alpha: 0.6) // More visible
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.3;
 
@@ -969,13 +969,13 @@ class StaffLinesPainter extends CustomPainter {
     // Double Barline
     final double endX = size.width - hPadding;
     final thinPaint = Paint()
-      ..color = const Color(0xFFB0C4DE).withOpacity(0.6)
+      ..color = const Color(0xFFB0C4DE).withValues(alpha: 0.6)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.2;
     canvas.drawLine(Offset(endX - 5, vPadding), Offset(endX - 5, size.height - vPadding), thinPaint);
 
     final thickPaint = Paint()
-      ..color = const Color(0xFFB0C4DE).withOpacity(0.8)
+      ..color = const Color(0xFFB0C4DE).withValues(alpha: 0.8)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.5;
     canvas.drawLine(Offset(endX, vPadding), Offset(endX, size.height - vPadding), thickPaint);
