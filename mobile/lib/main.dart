@@ -114,39 +114,40 @@ class MainScreenState extends State<MainScreen> {
         statusBarIconBrightness: Brightness.dark,
         statusBarBrightness: Brightness.light, // for iOS
       ),
-      child: Scaffold(
-        extendBody: true,
-        body: GradientBackground(
-          child: _screens[_selectedIndex],
-        ),
-        bottomNavigationBar: Container(
-          height: 78,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.85),
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(13),
-              topRight: Radius.circular(13),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF2E6FE9).withValues(alpha: 0.5),
-                blurRadius: 10,
-                spreadRadius: 1,
-                offset: const Offset(0, -2),
+      child: GradientBackground(
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          extendBody: true,
+          body: _screens[_selectedIndex],
+          bottomNavigationBar: Container(
+            height: 78,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.85),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(13),
+                topRight: Radius.circular(13),
               ),
-            ],
-          ),
-          child: Row(
-            children: _navItems.asMap().entries.map((entry) {
-              final index = entry.key;
-              final item = entry.value;
-              return _buildNavItem(
-                index,
-                item['activeIcon']!,
-                item['inactiveIcon']!,
-                item['label']!,
-              );
-            }).toList(),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF2E6FE9).withValues(alpha: 0.5),
+                  blurRadius: 10,
+                  spreadRadius: 1,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: _navItems.asMap().entries.map((entry) {
+                final index = entry.key;
+                final item = entry.value;
+                return _buildNavItem(
+                  index,
+                  item['activeIcon']!,
+                  item['inactiveIcon']!,
+                  item['label']!,
+                );
+              }).toList(),
+            ),
           ),
         ),
       ),
