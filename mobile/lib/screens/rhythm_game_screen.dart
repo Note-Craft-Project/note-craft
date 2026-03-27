@@ -6,6 +6,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:record/record.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../main.dart'; // For GradientBackground
 
 // Providers
 class BpmNotifier extends Notifier<double> {
@@ -193,9 +194,45 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
 
   void _onInputTriggered() {
     if (_gameState != GameState.playing) return;
-    setState(() {
-      _feedbackText = "PERFECT";
+
+    final progress = _animationController.value;
+    
+    // We expect a note at 0.0, 0.25, 0.5, 0.75 of the measure
+    // Find the closest expected beat
+    double closestBeatProgress = (progress * 4).round() / 4.0;
+    int beatIndexInMeasure = (progress * 4).round() % 4;
+    int measureIndex = _currentBeatGlobal ~/ 4;
+    int absoluteBeatIndex = (measureIndex * 4) + beatIndexInMeasure;
+
+    // Check if the pattern expects a note here
+    if (absoluteBeatIndex >= _rhythmPattern.length || _rhythmPattern[absoluteBeatIndex] == 0) {
+      _showFeedback("MISS", Colors.red);
+      return;
+    }
+
+    double diff = (progress - closestBeatProgress).abs();
+    
+    // Precision thresholds (at 60BPM, 0.025 is ~100ms)
+    // We scale this with BPM to keep difficulty consistent or fixed duration?
+    // Music games usually use fixed duration (e.g. 50ms for Perfect)
+    // 50ms at 60BPM is 0.05 beats, which is 0.0125 normalized progress.
+    const perfectThreshold = 0.025; 
+    const goodThreshold = 0.05;
+
+    if (diff < perfectThreshold) {
+      _showFeedback("PERFECT", Colors.green);
       _perfectCount++;
+    } else if (diff < goodThreshold) {
+      _showFeedback("GOOD", Colors.orange);
+      _perfectCount++; // GOOD also counts for score? Or half?
+    } else {
+      _showFeedback("MISS", Colors.red);
+    }
+  }
+
+  void _showFeedback(String text, Color color) {
+    setState(() {
+      _feedbackText = text;
     });
     _feedbackTimer?.cancel();
     _feedbackTimer = Timer(const Duration(milliseconds: 500), () => setState(() => _feedbackText = ""));
@@ -388,54 +425,217 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
   Widget build(BuildContext context) {
     final bpm = ref.watch(bpmProvider);
     final inputType = ref.watch(inputTypeProvider);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFE8F0FF),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: SvgPicture.asset(
-                      'assets/icons/back_arrow.svg',
-                      width: 22,
-                      height: 22,
-                    ),
-                    onPressed: () => Navigator.pop(context),
+      body: GradientBackground(
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              // Header (White with rounded bottom corners)
+              Container(
+                height: 65,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(15),
+                    bottomRight: Radius.circular(15),
                   ),
-                  Expanded(child: Text("Rhythm Level 1", textAlign: TextAlign.center, style: GoogleFonts.ubuntu(fontSize: 20, fontWeight: FontWeight.bold))),
-                  const SizedBox(width: 48),
-                ],
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: SvgPicture.asset(
+                          'assets/icons/back_arrow.svg',
+                          width: 22,
+                          height: 22,
+                        ),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      Expanded(
+                        child: Text(
+                          "Rhythm Level 1",
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.ubuntu(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF0E2576),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 48),
+                    ],
+                  ),
+                ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildBpmBadge(bpm),
-                  _buildInputToggle(inputType),
-                ],
+
+              const SizedBox(height: 20),
+
+              // Controls Bar
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildBpmBadge(bpm),
+                    _buildInputToggle(inputType),
+                  ],
+                ),
               ),
-            ),
-            const Spacer(),
-            if (_countdownText.isNotEmpty) Text(_countdownText, style: GoogleFonts.ubuntu(fontSize: 80, fontWeight: FontWeight.bold, color: const Color(0xFF1A3D7C))),
-            if (_feedbackText.isNotEmpty) Text(_feedbackText, style: GoogleFonts.ubuntu(fontSize: 30, fontWeight: FontWeight.bold, color: Colors.green)),
-            const Spacer(),
-            Padding(
-              padding: const EdgeInsets.all(32),
-              child: _build3DButton(
-                text: _gameState == GameState.playing ? "STOP" : "START",
-                height: 60,
-                fontSize: 20,
-                onTap: _togglePlay,
+
+              const Spacer(flex: 3),
+
+              // Area: Staff Music (Field Tengah) - Much flatter now
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: inputType == InputType.tap ? _onInputTriggered : null,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    alignment: Alignment.center,
+                    children: [
+                      // 1. Staff Background Container
+                      Container(
+                        height: 110,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF1A3D7C).withValues(alpha: 0.1),
+                              blurRadius: 15,
+                              spreadRadius: 1,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                      ),
+                      
+                      // 2. Staff Lines (Clipped to Container)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: SizedBox(
+                          height: 110,
+                          width: double.infinity,
+                          child: CustomPaint(
+                            painter: StaffLinesPainter(),
+                          ),
+                        ),
+                      ),
+
+                      // 3. Notes Visualization
+                      Positioned.fill(
+                        child: CustomPaint(
+                          painter: NotesPainter(
+                            pattern: _rhythmPattern,
+                            currentMeasure: _currentBeatGlobal ~/ 4,
+                          ),
+                        ),
+                      ),
+
+                      // 4. Playhead (Not Clipped, allows overflow)
+                      Positioned.fill(
+                        child: AnimatedBuilder(
+                          animation: _animationController,
+                          builder: (context, _) {
+                            return CustomPaint(
+                              painter: PlayheadPainter(
+                                progress: _animationController.value,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ],
+
+              const Spacer(),
+
+              // FEEDBACK & ANIMATION STATUS
+              if (_countdownText.isNotEmpty)
+                Text(
+                  _countdownText,
+                  style: GoogleFonts.ubuntu(
+                    fontSize: 80,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF1A3D7C),
+                  ),
+                ),
+              
+              if (_feedbackText.isNotEmpty)
+                Text(
+                  _feedbackText,
+                  style: GoogleFonts.ubuntu(
+                    fontSize: 30,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                ),
+
+              const Spacer(),
+
+              // Tap Area Hint
+              if (_gameState == GameState.playing)
+                _buildTapHint(inputType),
+
+              const Spacer(flex: 2),
+
+              // Bottom Button
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 32),
+                child: _build3DButton(
+                  text: _gameState == GameState.playing || _gameState == GameState.countdown ? "Stop" : "Start",
+                  height: 58,
+                  fontSize: 18,
+                  onTap: _togglePlay,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _buildTapHint(InputType type) {
+    return Column(
+      children: [
+        Container(
+          width: 200,
+          height: 100,
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              colors: [
+                const Color(0xFF6C9FFD).withValues(alpha: 0.3),
+                const Color(0xFF6C9FFD).withValues(alpha: 0.0),
+              ],
+            ),
+          ),
+          child: Center(
+            child: Text(
+              type == InputType.tap ? "Tap Here" : "Clap Now",
+              style: GoogleFonts.ubuntu(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF4F8BFB).withValues(alpha: 0.8),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -451,23 +651,51 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
               Padding(
                 padding: const EdgeInsets.only(left: 20, top: 5),
                 child: Container(
-                  height: 32,
-                  padding: const EdgeInsets.only(left: 20, right: 15),
+                  height: 30, // Proportional height
+                  padding: const EdgeInsets.only(left: 25, right: 15),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [BoxShadow(color: const Color(0xFF2E6FE9).withValues(alpha: 0.15), blurRadius: 10, offset: const Offset(0, 4))],
+                    borderRadius: BorderRadius.circular(15),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF2E6FE9).withValues(alpha: 0.15),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
                   child: Center(
-                    child: Text("${bpm.toInt()} bpm", style: GoogleFonts.ubuntu(fontWeight: FontWeight.bold, fontSize: 15, color: const Color(0xFF0E2576))),
+                    child: Text(
+                      "${bpm.toInt()} bpm",
+                      style: GoogleFonts.ubuntu(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: const Color(0xFF0E2576),
+                      ),
+                    ),
                   ),
                 ),
               ),
               Stack(
                 alignment: Alignment.center,
                 children: [
-                  ClipPath(clipper: TrapezoidClipper(), child: Container(width: 40, height: 44, color: Colors.white)),
-                  Image.asset('assets/images/metronome_icon.png', width: 26, height: 26, fit: BoxFit.contain),
+                  ClipPath(
+                    clipper: TrapezoidClipper(),
+                    child: Container(
+                      width: 44,
+                      height: 52,
+                      color: Colors.white,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2), // Precision centering
+                    child: Image.asset(
+                      'assets/images/metronome_icon.png',
+                      width: 32,
+                      height: 32,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -537,10 +765,177 @@ class TrapezoidClipper extends CustomClipper<Path> {
   @override
   Path getClip(Size size) {
     Path path = Path();
-    double w = size.width; double h = size.height;
-    path.moveTo(w * 0.2, 0); path.lineTo(w * 0.8, 0); path.lineTo(w, h); path.lineTo(0, h); path.close();
+    double w = size.width;
+    double h = size.height;
+    double r = 12.0; // Larger radius for more organic feel
+
+    // Top edge width (wider top based on design)
+    double xTopLeft = w * 0.28;
+    double xTopRight = w * 0.72;
+
+    path.moveTo(xTopLeft + r, 0);
+    path.lineTo(xTopRight - r, 0);
+    path.quadraticBezierTo(xTopRight, 0, xTopRight + r * 0.3, r * 0.5); 
+    path.lineTo(w - r * 0.3, h - r);
+    path.quadraticBezierTo(w, h, w - r, h);
+    path.lineTo(r, h);
+    path.quadraticBezierTo(0, h, r * 0.3, h - r);
+    path.lineTo(xTopLeft - r * 0.3, r * 0.5);
+    path.quadraticBezierTo(xTopLeft, 0, xTopLeft + r, 0);
+    
+    path.close();
     return path;
   }
+
   @override
-  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
+  bool shouldReclip(CustomClipper<Path> oldClipper) => true;
+}
+
+/// Painter for the static Staff Lines and Barline
+class StaffLinesPainter extends CustomPainter {
+  static const int numLines = 4;
+  static const double vPadding = 20.0; // Much smaller for flat staff
+  static const double hPadding = 16.0; 
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double innerHeight = size.height - (2 * vPadding);
+    final double lineSpacing = innerHeight / (numLines - 1);
+
+    final linePaint = Paint()
+      ..color = const Color(0xFFB0C4DE).withOpacity(0.4)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+
+    // 1. Draw 4 Staff Lines
+    for (int i = 0; i < numLines; i++) {
+      final y = vPadding + (i * lineSpacing);
+      canvas.drawLine(Offset(hPadding, y), Offset(size.width - hPadding, y), linePaint);
+    }
+
+    // 2. Draw Double Barline (Mockup looks like thin + thin or thin + thick)
+    final double endX = size.width - hPadding;
+    
+    // Thin line 1
+    final thinPaint = Paint()
+      ..color = const Color(0xFFB0C4DE).withOpacity(0.6)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+    canvas.drawLine(Offset(endX - 5, vPadding), Offset(endX - 5, size.height - vPadding), thinPaint);
+
+    // Thick line (End bar)
+    final thickPaint = Paint()
+      ..color = const Color(0xFFB0C4DE).withOpacity(0.8)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.5;
+    canvas.drawLine(Offset(endX, vPadding), Offset(endX, size.height - vPadding), thickPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+
+  static double getLineY(double height, int lineIndex) {
+    final innerHeight = height - (2 * vPadding);
+    final lineSpacing = innerHeight / (numLines - 1);
+    return vPadding + (lineIndex * lineSpacing);
+  }
+}
+
+/// Painter for the long Playhead that can overflow the container
+class PlayheadPainter extends CustomPainter {
+  final double progress;
+  static const double hPadding = 16.0;
+
+  PlayheadPainter({required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double innerWidth = size.width - (2 * hPadding);
+    
+    final playheadPaint = Paint()
+      ..color = const Color(0xFF1E90FF)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.5
+      ..strokeCap = StrokeCap.square; 
+
+    final x = hPadding + (progress * innerWidth);
+    
+    // Playhead length adjusted for subtle overflow (closer to design)
+    canvas.drawLine(
+      Offset(x, -15),
+      Offset(x, size.height + 15),
+      playheadPaint
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant PlayheadPainter oldDelegate) => oldDelegate.progress != progress;
+}
+/// Painter for Rhythm Notes on the Staff
+class NotesPainter extends CustomPainter {
+  final List<int> pattern;
+  final int currentMeasure;
+  static const double hPadding = 16.0;
+
+  NotesPainter({required this.pattern, required this.currentMeasure});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double innerWidth = size.width - (2 * hPadding);
+    final double centerY = StaffLinesPainter.getLineY(size.height, 2); // 2nd line
+
+    final notePaint = Paint()
+      ..color = const Color(0xFF0E2576)
+      ..style = PaintingStyle.fill;
+
+    final stemPaint = Paint()
+      ..color = const Color(0xFF0E2576)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+
+    int startIndex = currentMeasure * 4;
+    for (int i = 0; i < 4; i++) {
+      int index = startIndex + i;
+      if (index >= pattern.length) break;
+
+      if (pattern[index] == 1) {
+        // Draw Quarter Note
+        double x = hPadding + (i / 4.0 * innerWidth) + (innerWidth / 8.0); // Center of beat
+        
+        // Note Head (Oval)
+        canvas.drawOval(
+          Rect.fromCenter(center: Offset(x, centerY), width: 14, height: 10),
+          notePaint,
+        );
+
+        // Stem (Upwards)
+        canvas.drawLine(
+          Offset(x + 6, centerY),
+          Offset(x + 6, centerY - 25),
+          stemPaint,
+        );
+      } else {
+        // Draw Quarter Rest (Simplified)
+        double x = hPadding + (i / 4.0 * innerWidth) + (innerWidth / 8.0);
+        final restPaint = Paint()
+          ..color = const Color(0xFFB0C4DE)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.0;
+        
+        // Simple Z shape for rest
+        canvas.drawPath(
+          Path()
+            ..moveTo(x - 5, centerY - 10)
+            ..lineTo(x + 5, centerY - 5)
+            ..lineTo(x - 5, centerY + 5)
+            ..lineTo(x + 5, centerY + 10),
+          restPaint,
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant NotesPainter oldDelegate) => 
+    oldDelegate.currentMeasure != currentMeasure;
 }
