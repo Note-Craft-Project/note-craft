@@ -43,7 +43,7 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
 
   GameState _gameState = GameState.idle;
   String _feedbackText = "";
-  String _countdownText = "";
+  int _countdownValue = -1; // 3, 2, 1, 0 (START), -1 (Hidden)
 
   final List<int> _rhythmPattern = [1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 0];
   int _currentBeatGlobal = 0;
@@ -152,15 +152,14 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
       _currentBeatGlobal = 0;
       _lastSoundBeat = -1;
       _perfectCount = 0;
+      _countdownValue = 3;
     });
-    int counter = 3;
-    _countdownText = counter.toString();
+
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      counter--;
-      if (counter > 0) {
-        setState(() => _countdownText = counter.toString());
-      } else if (counter == 0) {
-        setState(() => _countdownText = "GO!");
+      if (_countdownValue > 1) {
+        setState(() => _countdownValue--);
+      } else if (_countdownValue == 1) {
+        setState(() => _countdownValue = 0); // 0 means "START"
       } else {
         timer.cancel();
         _startGame();
@@ -171,7 +170,7 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
   void _startGame() {
     setState(() {
       _gameState = GameState.playing;
-      _countdownText = "";
+      _countdownValue = -1; // Hide countdown
     });
     final bpm = ref.read(bpmProvider);
     final beatDuration = Duration(milliseconds: (60000 / bpm).round());
@@ -565,13 +564,23 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
               const Spacer(),
 
               // FEEDBACK & ANIMATION STATUS
-              if (_countdownText.isNotEmpty)
-                Text(
-                  _countdownText,
-                  style: GoogleFonts.ubuntu(
-                    fontSize: 80,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF1A3D7C),
+              if (_gameState == GameState.countdown)
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  transitionBuilder: (child, animation) {
+                    return ScaleTransition(
+                      scale: animation,
+                      child: FadeTransition(
+                        opacity: animation,
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: SvgPicture.asset(
+                    'assets/images/gameplay/${_countdownValue == 0 ? "START" : _countdownValue.toString()}.svg',
+                    key: ValueKey(_countdownValue),
+                    height: 80,
+                    fit: BoxFit.contain,
                   ),
                 ),
               
