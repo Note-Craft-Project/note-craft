@@ -7,6 +7,7 @@ import 'package:record/record.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../main.dart'; // For GradientBackground
+import '../widgets/score_modal.dart';
 
 // Providers
 class BpmNotifier extends Notifier<double> {
@@ -119,17 +120,23 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
     _gameState = GameState.completed;
     _animationController.stop();
     _stopClapDetection();
-    int stars = 0;
     int totalNotes = _rhythmPattern.where((n) => n == 1).length;
     double ratio = _perfectCount / totalNotes;
+    
+    int stars = 0;
     if (ratio >= 0.9) {
       stars = 3;
     } else if (ratio >= 0.6) {
       stars = 2;
-    } else {
+    } else if (ratio > 0.0) {
       stars = 1;
     }
-    _showCompletionDialog(stars);
+
+    // Custom Score Calculation
+    int score = (_perfectCount * 100); 
+    if (ratio == 1.0) score += 500; // Bonus for Perfect Run
+
+    _showCompletionDialog(stars, score);
   }
 
   Future<void> _setupAudio() async {
@@ -429,26 +436,23 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
     );
   }
 
-  void _showCompletionDialog(int stars) {
+  void _showCompletionDialog(int stars, int score) {
     showDialog(
       context: context,
+      barrierColor: Colors.black.withOpacity(0.4),
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Text("Level Completed!", textAlign: TextAlign.center, style: GoogleFonts.ubuntu(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(3, (i) => Icon(i < stars ? Icons.star : Icons.star_border, color: Colors.orange, size: 40)),
-            ),
-            const SizedBox(height: 16),
-            Text("Accuracy: ${((_perfectCount / _rhythmPattern.where((n)=>n==1).length)*100).toInt()}%", style: GoogleFonts.ubuntu()),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Home")),
-        ],
+      builder: (context) => ScoreModal(
+        score: score,
+        stars: stars,
+        onHomePressed: () {
+          Navigator.pop(context); // Close Dialog
+          Navigator.pop(context); // Go back to Level Selection/Main
+        },
+        onNextLevelPressed: () {
+          Navigator.pop(context); // Close Dialog
+          // Restart or Move to next level (just restart for now)
+          _startCountdown();
+        },
       ),
     );
   }
