@@ -280,45 +280,51 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
   void _onInputTriggered() {
     if (_gameState != GameState.playing) return;
 
-    final progress = _animationController.value;
+    final bpm = ref.read(bpmProvider);
+    final msPerBeat = 60000.0 / bpm;
+    final msPerMeasure = msPerBeat * 4;
     
-    // We expect a note at 0.0, 0.25, 0.5, 0.75 of the measure
-    // Find the closest expected beat
-    double closestBeatProgress = (progress * 4).round() / 4.0;
-    int beatIndexInMeasure = (progress * 4).round() % 4;
-    int measureIndex = _currentBeatGlobal ~/ 4;
-    int absoluteBeatIndex = (measureIndex * 4) + beatIndexInMeasure;
+    // Total elapsed time in current measure (ms)
+    final currentMeasureProgressMs = _animationController.value * msPerMeasure;
+    
+    // Notes are centered at 0.5, 1.5, 2.5, 3.5 beats
+    double beatFloat = (currentMeasureProgressMs / msPerBeat) - 0.5;
+    int beatOffset = beatFloat.round(); // 0, 1, 2, 3 (or 4 for next measure)
 
-    // Check if the pattern expects a note here (1: Quarter, 2: Half)
-    int expectedValue = currentLevel.pattern[absoluteBeatIndex];
-    if (absoluteBeatIndex >= currentLevel.pattern.length || expectedValue <= 0) {
-      // If we clap on a rest (0) or continuation (-1), show MISS
+    int currentMeasureBaseIndex = (_currentBeatGlobal ~/ 4) * 4;
+    int absoluteBeatIndex = currentMeasureBaseIndex + beatOffset;
+
+    if (absoluteBeatIndex < 0 || absoluteBeatIndex >= currentLevel.pattern.length) {
       _showFeedback("MISS", Colors.red);
       return;
     }
 
-    // Check if we already hit this note
+    int expectedValue = currentLevel.pattern[absoluteBeatIndex];
+    if (expectedValue <= 0) {
+      _showFeedback("MISS", Colors.red);
+      return;
+    }
+
     if (_hitNotes.contains(absoluteBeatIndex)) return;
 
-    double diff = (progress - closestBeatProgress).abs();
+    // Perfect target is at the center of the beat (0.5, 1.5, etc.)
+    double targetTimeMs = (beatOffset + 0.5) * msPerBeat;
+    double diffMs = (currentMeasureProgressMs - targetTimeMs).abs();
     
-    // Precision thresholds (at 60BPM, 0.025 is ~100ms)
-    const perfectThreshold = 0.025; 
-    const goodThreshold = 0.05;
+    const perfectThresholdMs = 100.0; // Slightly more lenient to start
+    const goodThresholdMs = 180.0;
 
-    if (diff < perfectThreshold) {
+    if (diffMs < perfectThresholdMs) {
       _showFeedback("PERFECT", Colors.green);
       _perfectCount++;
       _hitNotes.add(absoluteBeatIndex);
-    } else if (diff < goodThreshold) {
+    } else if (diffMs < goodThresholdMs) {
       _showFeedback("GOOD", Colors.orange);
       _perfectCount++; 
       _hitNotes.add(absoluteBeatIndex);
     } else {
       _showFeedback("MISS", Colors.red);
-      // We don't add to _hitNotes for MISS so they might try again? 
-      // Usually a MISS also "consumes" the note if it's late enough.
-      if (progress > closestBeatProgress) {
+      if (currentMeasureProgressMs > targetTimeMs) {
         _hitNotes.add(absoluteBeatIndex);
       }
     }
