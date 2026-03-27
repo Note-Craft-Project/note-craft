@@ -7,6 +7,7 @@ import 'package:record/record.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../main.dart'; // For GradientBackground
 import '../widgets/score_modal.dart';
+import '../models/level_data.dart';
 
 // Providers
 class BpmNotifier extends Notifier<double> {
@@ -27,7 +28,12 @@ enum InputType { tap, clap }
 enum GameState { idle, countdown, playing, completed }
 
 class RhythmGameScreen extends ConsumerStatefulWidget {
-  const RhythmGameScreen({super.key});
+  final int levelIndex;
+
+  const RhythmGameScreen({
+    super.key, 
+    required this.levelIndex,
+  });
 
   @override
   ConsumerState<RhythmGameScreen> createState() => _RhythmGameScreenState();
@@ -46,7 +52,7 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
   String _feedbackText = "";
   int _countdownValue = -1; // 3, 2, 1, 0 (START), -1 (Hidden)
 
-  final List<int> _rhythmPattern = [1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 0];
+  // Removed hardcoded _rhythmPattern
   int _currentBeatGlobal = 0;
   int _lastSoundBeat = -1;
   int _perfectCount = 0;
@@ -82,7 +88,7 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
       setState(() {
         int measureIndex = _currentBeatGlobal ~/ 4;
         _currentBeatGlobal = (measureIndex * 4) + currentBeatInMeasure;
-        if (_currentBeatGlobal >= _rhythmPattern.length) {
+        if (_currentBeatGlobal >= currentLevel.pattern.length) {
           _completeGame();
         }
       });
@@ -94,7 +100,7 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
       _lastSoundBeat = -1;
       setState(() {
         _currentBeatGlobal = ((_currentBeatGlobal ~/ 4) + 1) * 4;
-        if (_currentBeatGlobal >= _rhythmPattern.length) {
+        if (_currentBeatGlobal >= currentLevel.pattern.length) {
           _completeGame();
         } else {
           _animationController.forward(from: 0.0);
@@ -104,24 +110,19 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
   }
 
   void _playMetronomeSound(int beatIndex) {
-    if (beatIndex == 0) {
-      _audioPlayerHigh.stop().then((_) {
-        _audioPlayerHigh.seek(Duration.zero);
-        _audioPlayerHigh.play();
-      });
-    } else {
-      _audioPlayerLow.stop().then((_) {
-        _audioPlayerLow.seek(Duration.zero);
-        _audioPlayerLow.play();
-      });
-    }
+    final player = (beatIndex == 0) ? _audioPlayerHigh : _audioPlayerLow;
+    // stop() synchronously resets the player state so play() can re-trigger
+    player.stop().then((_) {
+      player.seek(Duration.zero);
+      player.play();
+    });
   }
 
   void _completeGame() {
     _gameState = GameState.completed;
     _animationController.stop();
     _stopClapDetection();
-    int totalNotes = _rhythmPattern.where((n) => n == 1).length;
+    int totalNotes = currentLevel.pattern.where((n) => n == 1 || n == 2).length;
     double ratio = _perfectCount / totalNotes;
     
     int stars = 0;
@@ -139,6 +140,8 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
 
     _showCompletionDialog(stars, score);
   }
+
+  RhythmLevel get currentLevel => rhythmLevels[widget.levelIndex];
 
   Future<void> _setupAudio() async {
     try {
@@ -286,9 +289,10 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
     int measureIndex = _currentBeatGlobal ~/ 4;
     int absoluteBeatIndex = (measureIndex * 4) + beatIndexInMeasure;
 
-    // Check if the pattern expects a note here
-    if (absoluteBeatIndex >= _rhythmPattern.length || _rhythmPattern[absoluteBeatIndex] == 0) {
-      // If we clap on a rest, show MISS (optional, common in rhythm games)
+    // Check if the pattern expects a note here (1: Quarter, 2: Half)
+    int expectedValue = currentLevel.pattern[absoluteBeatIndex];
+    if (absoluteBeatIndex >= currentLevel.pattern.length || expectedValue <= 0) {
+      // If we clap on a rest (0) or continuation (-1), show MISS
       _showFeedback("MISS", Colors.red);
       return;
     }
@@ -501,8 +505,27 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
         },
         onNextLevelPressed: () {
           Navigator.pop(context); // Close Dialog
-          // Restart or Move to next level (just restart for now)
-          _startCountdown();
+          
+          if (widget.levelIndex < rhythmLevels.length - 1) {
+            final nextLevel = rhythmLevels[widget.levelIndex + 1];
+            if (nextLevel.isLocked) {
+              // If next level is locked, just go back to selection
+              Navigator.pop(context);
+            } else {
+              // Replace current screen with next level
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => RhythmGameScreen(
+                    levelIndex: widget.levelIndex + 1,
+                  ),
+                ),
+              );
+            }
+          } else {
+            // No more levels
+            Navigator.pop(context);
+          }
         },
       ),
     );
@@ -550,7 +573,7 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
                       ),
                       Expanded(
                         child: Text(
-                          "Rhythm Level 1",
+                          "Rhythm ${currentLevel.title}",
                           textAlign: TextAlign.center,
                           style: GoogleFonts.ubuntu(
                             fontSize: 18,
@@ -670,8 +693,8 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
                             Positioned.fill(
                               child: CustomPaint(
                                   painter: NotesPainter(
-                                    pattern: _rhythmPattern,
-                                    currentMeasure: (_currentBeatGlobal ~/ 4).clamp(0, (_rhythmPattern.length - 1) ~/ 4),
+                                    pattern: currentLevel.pattern,
+                                    currentMeasure: (_currentBeatGlobal ~/ 4).clamp(0, (currentLevel.pattern.length - 1) ~/ 4),
                                   ),
                               ),
                             ),
@@ -1038,11 +1061,18 @@ class NotesPainter extends CustomPainter {
       int absoluteIndex = (currentMeasure * 4) + i;
       if (absoluteIndex >= pattern.length) break;
 
-      bool isNote = pattern[absoluteIndex] == 1;
+      int noteValue = pattern[absoluteIndex];
+      if (noteValue == -1) continue; // Continuation beat, don't draw
+
+      bool isNote = noteValue == 1 || noteValue == 2;
+      String glyph = '';
+      if (noteValue == 1) glyph = '\u{1D15F}'; // Quarter Note
+      else if (noteValue == 2) glyph = '\u{1D15E}'; // Half Note
+      else glyph = '\u{1D13D}'; // Quarter Rest
       
       final textPainter = TextPainter(
         text: TextSpan(
-          text: isNote ? '\u{1D15F}' : '\u{1D13D}', // Back to standard Quarter Note
+          text: glyph,
           style: GoogleFonts.notoMusic(
             color: const Color(0xFF0E2576),
             fontSize: fontSize,
@@ -1057,16 +1087,13 @@ class NotesPainter extends CustomPainter {
       double y;
 
       if (isNote) {
-          // Centering Logic for Noto Music Quarter Note (\u1D15F)
           y = getYForPitch('B4', lineSpacing, StaffLinesPainter.vPadding);
-          
           canvas.save();
-          // Offset adjustments for centering head of \u1D15F
+          // Adjust translation for Half Note if needed (usually same as quarter)
           canvas.translate(x - (textPainter.width / 2.1), y - (textPainter.height * 0.77)); 
           textPainter.paint(canvas, Offset.zero);
           canvas.restore();
       } else {
-          // Quarter Rest center (Line 3 area)
           y = StaffLinesPainter.vPadding + (2 * lineSpacing);
           canvas.save();
           canvas.translate(x - (textPainter.width / 2), y - (textPainter.height * 0.5));

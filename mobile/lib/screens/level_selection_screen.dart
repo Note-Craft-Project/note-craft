@@ -3,20 +3,9 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:notecraft/main.dart'; 
 import 'package:notecraft/screens/rhythm_game_screen.dart';
+import 'package:notecraft/models/level_data.dart';
 
-class Level {
-  final String title;
-  final String status;
-  final int stars; 
-  final bool isLocked;
-
-  const Level({
-    required this.title,
-    required this.status,
-    required this.stars,
-    this.isLocked = false,
-  });
-}
+// Removed local Level class (now imported from level_data.dart)
 
 class LevelSelectionScreen extends StatelessWidget {
   final String mode;
@@ -25,15 +14,7 @@ class LevelSelectionScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final List<Level> levels = [
-      const Level(title: 'Tutorial', status: 'Completed', stars: 0),
-      const Level(title: 'Level 01', status: 'Completed', stars: 3),
-      const Level(title: 'Level 02', status: 'Completed', stars: 2),
-      const Level(title: 'Level 03', status: 'On Progress', stars: 0),
-      const Level(title: 'Level 04', status: 'Locked', stars: 0, isLocked: true),
-      const Level(title: 'Level 05', status: 'Locked', stars: 0, isLocked: true),
-      const Level(title: 'Level 06', status: 'Locked', stars: 0, isLocked: true),
-    ];
+    final List<RhythmLevel> levels = rhythmLevels;
 
     return Scaffold(
       body: GradientBackground(
@@ -90,7 +71,7 @@ class LevelSelectionScreen extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 24),
                   itemCount: levels.length,
                   itemBuilder: (context, index) {
-                    return _buildLevelCard(context, levels[index]);
+                    return _buildLevelCard(context, levels[index], index);
                   },
                 ),
               ),
@@ -101,7 +82,7 @@ class LevelSelectionScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildLevelCard(BuildContext context, Level level) {
+  Widget _buildLevelCard(BuildContext context, RhythmLevel level, int index) {
     final bool unlocked = !level.isLocked;
 
     return GestureDetector(
@@ -110,7 +91,11 @@ class LevelSelectionScreen extends StatelessWidget {
           : () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const RhythmGameScreen()),
+                MaterialPageRoute(
+                  builder: (context) => RhythmGameScreen(
+                    levelIndex: index,
+                  ),
+                ),
               );
             },
       child: Container(
