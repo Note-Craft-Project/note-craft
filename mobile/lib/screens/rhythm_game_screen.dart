@@ -4,7 +4,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:record/record.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../main.dart'; // For GradientBackground
 import '../widgets/score_modal.dart';
@@ -51,6 +50,8 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
   int _currentBeatGlobal = 0;
   int _lastSoundBeat = -1;
   int _perfectCount = 0;
+  final Set<int> _hitNotes = {}; // Track which notes have been hit
+  DateTime? _lastClapTriggerTime; // For debouncing clap input
 
   @override
   void initState() {
@@ -160,7 +161,8 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
     super.dispose();
   }
 
-  void _togglePlay() {
+  Future<void> _togglePlay() async {
+    debugPrint("DEBUG: _togglePlay called. State: $_gameState");
     if (_gameState == GameState.playing || _gameState == GameState.countdown) {
       setState(() {
         _gameState = GameState.idle;
@@ -169,11 +171,27 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
         _stopClapDetection();
       });
     } else {
+      // Pre-check permission on user click to avoid browser blocking on Web/Mobile
+      if (ref.read(inputTypeProvider) == InputType.clap) {
+        debugPrint("DEBUG: Checking/Requesting microphone permission...");
+        try {
+          final hasPerm = await _recorder.hasPermission();
+          if (!hasPerm) {
+            debugPrint("DEBUG: Permission denied.");
+            return;
+          }
+          debugPrint("DEBUG: Permission granted.");
+        } catch (e) {
+          debugPrint("DEBUG: Permission check error: $e");
+          return;
+        }
+      }
       _startCountdown();
     }
   }
 
   void _startCountdown() {
+    debugPrint("DEBUG: _startCountdown starting...");
     final bpm = ref.read(bpmProvider);
     final beatDurationMs = (60000 / bpm).round();
     
@@ -185,6 +203,7 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
       _lastSoundBeat = -1; // Reset beat sound trigger
       _countdownValue = 3;
       _animationController.value = 0.0; // Reset playhead to start
+      _hitNotes.clear(); // Clear hit notes for new game
     });
 
     // Initial click for '3'
@@ -208,6 +227,7 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
   }
 
   void _startGame() {
+    debugPrint("DEBUG: _startGame called.");
     setState(() {
       _gameState = GameState.playing;
       _countdownValue = -1; // Hide countdown
@@ -222,14 +242,37 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
   }
 
   Future<void> _startClapDetection() async {
-    if (await Permission.microphone.request().isGranted) {
-      _amplitudeSubscription = _recorder.onAmplitudeChanged(const Duration(milliseconds: 50)).listen((amp) {
-        if (amp.current > -20) _onInputTriggered();
-      });
+    try {
+      debugPrint("DEBUG: _startClapDetection called.");
+      if (await _recorder.hasPermission()) {
+        debugPrint("DEBUG: Starting stream...");
+        // Use startStream for amplitude detection without saving to file
+        await _recorder.startStream(const RecordConfig());
+        debugPrint("DEBUG: Stream started.");
+        
+        _amplitudeSubscription = _recorder.onAmplitudeChanged(const Duration(milliseconds: 50)).listen((amp) {
+          // Use max amplitude for peak detection, and add a small debounce
+          if (amp.max > -25) { 
+            final now = DateTime.now();
+            if (_lastClapTriggerTime == null || now.difference(_lastClapTriggerTime!).inMilliseconds > 200) {
+              _lastClapTriggerTime = now;
+              debugPrint("DEBUG: Clap triggered! Amp: ${amp.max}");
+              _onInputTriggered();
+            }
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint("DEBUG: Error in _startClapDetection: $e");
     }
   }
 
-  void _stopClapDetection() => _amplitudeSubscription?.cancel();
+  Future<void> _stopClapDetection() async {
+    await _amplitudeSubscription?.cancel();
+    if (await _recorder.isRecording()) {
+      await _recorder.stop();
+    }
+  }
 
   void _onInputTriggered() {
     if (_gameState != GameState.playing) return;
@@ -245,27 +288,35 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
 
     // Check if the pattern expects a note here
     if (absoluteBeatIndex >= _rhythmPattern.length || _rhythmPattern[absoluteBeatIndex] == 0) {
+      // If we clap on a rest, show MISS (optional, common in rhythm games)
       _showFeedback("MISS", Colors.red);
       return;
     }
 
+    // Check if we already hit this note
+    if (_hitNotes.contains(absoluteBeatIndex)) return;
+
     double diff = (progress - closestBeatProgress).abs();
     
     // Precision thresholds (at 60BPM, 0.025 is ~100ms)
-    // We scale this with BPM to keep difficulty consistent or fixed duration?
-    // Music games usually use fixed duration (e.g. 50ms for Perfect)
-    // 50ms at 60BPM is 0.05 beats, which is 0.0125 normalized progress.
     const perfectThreshold = 0.025; 
     const goodThreshold = 0.05;
 
     if (diff < perfectThreshold) {
       _showFeedback("PERFECT", Colors.green);
       _perfectCount++;
+      _hitNotes.add(absoluteBeatIndex);
     } else if (diff < goodThreshold) {
       _showFeedback("GOOD", Colors.orange);
-      _perfectCount++; // GOOD also counts for score? Or half?
+      _perfectCount++; 
+      _hitNotes.add(absoluteBeatIndex);
     } else {
       _showFeedback("MISS", Colors.red);
+      // We don't add to _hitNotes for MISS so they might try again? 
+      // Usually a MISS also "consumes" the note if it's late enough.
+      if (progress > closestBeatProgress) {
+        _hitNotes.add(absoluteBeatIndex);
+      }
     }
   }
 
@@ -674,7 +725,9 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
                   text: _gameState == GameState.playing || _gameState == GameState.countdown ? "Stop" : "Start",
                   height: 58,
                   fontSize: 18,
-                  onTap: _togglePlay,
+                  onTap: () {
+                    _togglePlay();
+                  },
                 ),
               ),
             ],
@@ -782,7 +835,9 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
   Widget _buildInputToggle(InputType current) {
     bool isClap = current == InputType.clap;
     return GestureDetector(
-      onTap: () => ref.read(inputTypeProvider.notifier).set(isClap ? InputType.tap : InputType.clap),
+      onTap: _gameState == GameState.idle 
+          ? () => ref.read(inputTypeProvider.notifier).set(isClap ? InputType.tap : InputType.clap)
+          : null,
       child: Container(
         width: 100,
         height: 38,
