@@ -37,7 +37,7 @@ Dikembangkan di bawah naungan **PT Bina Talenta Kursus Musik**, Note Craft hadir
 
 | Peran | Nama |
 | :--- | :--- |
-| **Owner (PT Bina Talenta)** | **Prasetya Rizky** |
+| **Owner (PT Bina Talenta)** | **Prasetya Rizky Purnama** |
 | **UI/UX Designer** | **Ruth Septriana Sipangkar** |
 | **Lead Developer** | **Syafiq Abiyyu Taqi** |
 
