@@ -34,7 +34,8 @@ class RhythmGameScreen extends ConsumerStatefulWidget {
 }
 
 class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with SingleTickerProviderStateMixin {
-  late AudioPlayer _audioPlayer;
+  late AudioPlayer _audioPlayerHigh;
+  late AudioPlayer _audioPlayerLow;
   late AudioRecorder _recorder;
   late AnimationController _animationController;
   StreamSubscription? _amplitudeSubscription;
@@ -53,7 +54,8 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
   @override
   void initState() {
     super.initState();
-    _audioPlayer = AudioPlayer();
+    _audioPlayerHigh = AudioPlayer();
+    _audioPlayerLow = AudioPlayer();
     _recorder = AudioRecorder();
     _animationController = AnimationController(vsync: this);
     _animationController.addListener(_onAnimationTick);
@@ -64,10 +66,17 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
   void _onAnimationTick() {
     if (_gameState != GameState.playing) return;
     double progress = _animationController.value;
+    
+    // Notes are visually at 0.125, 0.375, 0.625, 0.875
+    // We determine which beat we are currently in
     int currentBeatInMeasure = (progress * 4).floor().clamp(0, 3);
-    if (currentBeatInMeasure != _lastSoundBeat) {
+    
+    // Trigger metronome precisely at the center of each beat (where the note is)
+    double beatCenter = (currentBeatInMeasure + 0.5) / 4.0;
+    
+    if (progress >= beatCenter && currentBeatInMeasure != _lastSoundBeat) {
       _lastSoundBeat = currentBeatInMeasure;
-      _playMetronomeSound();
+      _playMetronomeSound(currentBeatInMeasure);
       setState(() {
         int measureIndex = _currentBeatGlobal ~/ 4;
         _currentBeatGlobal = (measureIndex * 4) + currentBeatInMeasure;
@@ -92,9 +101,18 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
     }
   }
 
-  void _playMetronomeSound() {
-    _audioPlayer.seek(Duration.zero);
-    _audioPlayer.play();
+  void _playMetronomeSound(int beatIndex) {
+    if (beatIndex == 0) {
+      _audioPlayerHigh.stop().then((_) {
+        _audioPlayerHigh.seek(Duration.zero);
+        _audioPlayerHigh.play();
+      });
+    } else {
+      _audioPlayerLow.stop().then((_) {
+        _audioPlayerLow.seek(Duration.zero);
+        _audioPlayerLow.play();
+      });
+    }
   }
 
   void _completeGame() {
@@ -116,7 +134,8 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
 
   Future<void> _setupAudio() async {
     try {
-      await _audioPlayer.setUrl('https://www.soundjay.com/button/button-10.mp3');
+      await _audioPlayerHigh.setAsset('assets/audio/click_high.wav');
+      await _audioPlayerLow.setAsset('assets/audio/click_low.wav');
     } catch (e) {
       debugPrint("Audio load error: $e");
     }
@@ -126,7 +145,8 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
   void dispose() {
     _countdownTimer?.cancel();
     _feedbackTimer?.cancel();
-    _audioPlayer.dispose();
+    _audioPlayerHigh.dispose();
+    _audioPlayerLow.dispose();
     _recorder.dispose();
     _animationController.dispose();
     _amplitudeSubscription?.cancel();
@@ -147,23 +167,36 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
   }
 
   void _startCountdown() {
+    final bpm = ref.read(bpmProvider);
+    final beatDurationMs = (60000 / bpm).round();
+    
     setState(() {
       _gameState = GameState.countdown;
-      _currentBeatGlobal = 0;
-      _lastSoundBeat = -1;
-      _perfectCount = 0;
+      _currentBeatGlobal = 0; // Reset to first measure
+      _perfectCount = 0; // Reset score
+      _feedbackText = ""; // Clear old feedback
+      _lastSoundBeat = -1; // Reset beat sound trigger
       _countdownValue = 3;
+      _animationController.value = 0.0; // Reset playhead to start
     });
 
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_countdownValue > 1) {
-        setState(() => _countdownValue--);
-      } else if (_countdownValue == 1) {
-        setState(() => _countdownValue = 0); // 0 means "START"
-      } else {
-        timer.cancel();
-        _startGame();
-      }
+    // Initial click for '3'
+    _playMetronomeSound(0); // High click on beat 1
+
+    _countdownTimer = Timer.periodic(Duration(milliseconds: beatDurationMs), (timer) {
+      setState(() {
+        if (_countdownValue > 1) {
+          _countdownValue--;
+          // Click for '2' and '1'
+          _playMetronomeSound(1); // Low click
+        } else if (_countdownValue == 1) {
+          _countdownValue = 0; // Show "START"
+          _playMetronomeSound(0); // High click for START
+        } else {
+          _countdownTimer?.cancel();
+          _startGame();
+        }
+      });
     });
   }
 
@@ -581,10 +614,10 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
                             // 3. Notes Visualization
                             Positioned.fill(
                               child: CustomPaint(
-                                painter: NotesPainter(
-                                  pattern: _rhythmPattern,
-                                  currentMeasure: _currentBeatGlobal ~/ 4,
-                                ),
+                                  painter: NotesPainter(
+                                    pattern: _rhythmPattern,
+                                    currentMeasure: (_currentBeatGlobal ~/ 4).clamp(0, (_rhythmPattern.length - 1) ~/ 4),
+                                  ),
                               ),
                             ),
 
@@ -937,7 +970,7 @@ class NotesPainter extends CustomPainter {
     double lineSpacing = staffHeight / (StaffLinesPainter.numLines - 1);
     
     // Modern notation scale
-    double fontSize = lineSpacing * 4.3; 
+    double fontSize = lineSpacing * 3.8; 
     
     double measureWidth = size.width - (hPadding * 2);
     double beatWidth = measureWidth / 4;
