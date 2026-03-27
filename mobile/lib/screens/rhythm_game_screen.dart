@@ -550,7 +550,7 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
                           children: [
                             // 1. Staff Background Container
                             Container(
-                              height: 110,
+                              height: 135, // Increased for more space
                               width: double.infinity,
                               decoration: BoxDecoration(
                                 color: Colors.white,
@@ -570,7 +570,7 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
                             ClipRRect(
                               borderRadius: BorderRadius.circular(8),
                               child: SizedBox(
-                                height: 110,
+                                height: 135,
                                 width: double.infinity,
                                 child: CustomPaint(
                                   painter: StaffLinesPainter(),
@@ -828,10 +828,34 @@ class TrapezoidClipper extends CustomClipper<Path> {
   bool shouldReclip(CustomClipper<Path> oldClipper) => true;
 }
 
+/// Staff Coordinate Helper
+double getYForPitch(String pitchName, double lineSpacing, double topPadding) {
+  // Treble Clef mapping (B4 is the middle line 3)
+  // Distance is measured in "half spaces" from B4
+  final Map<String, int> pitchOffsetFromB4 = {
+    'F5': 4,
+    'E5': 3,
+    'D5': 2,
+    'C5': 1,
+    'B4': 0, // On line 3
+    'A4': -1,
+    'G4': -2,
+    'F4': -3,
+    'E4': -4,
+  };
+
+  int offset = pitchOffsetFromB4[pitchName] ?? 0;
+  
+  // Line 5 is top (index 0), Line 3 is index 2
+  double middleLineY = topPadding + 2 * lineSpacing;
+  
+  return middleLineY - (offset * (lineSpacing / 2));
+}
+
 /// Painter for the static Staff Lines and Barline
 class StaffLinesPainter extends CustomPainter {
-  static const int numLines = 4;
-  static const double vPadding = 20.0; // Much smaller for flat staff
+  static const int numLines = 5;
+  static const double vPadding = 25.0; // Reduced for more spaced lines
   static const double hPadding = 16.0; 
 
   @override
@@ -840,27 +864,24 @@ class StaffLinesPainter extends CustomPainter {
     final double lineSpacing = innerHeight / (numLines - 1);
 
     final linePaint = Paint()
-      ..color = const Color(0xFFB0C4DE).withOpacity(0.4)
+      ..color = const Color(0xFFB0C4DE).withOpacity(0.6) // More visible
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
+      ..strokeWidth = 1.3;
 
-    // 1. Draw 4 Staff Lines
-    for (int i = 0; i < numLines; i++) {
-      final y = vPadding + (i * lineSpacing);
-      canvas.drawLine(Offset(hPadding, y), Offset(size.width - hPadding, y), linePaint);
+    // Draw 5 Staff Lines
+    for (int i = 0 ; i < numLines; i++) {
+        final y = vPadding + (i * lineSpacing);
+        canvas.drawLine(Offset(hPadding, y), Offset(size.width - hPadding, y), linePaint);
     }
 
-    // 2. Draw Double Barline (Mockup looks like thin + thin or thin + thick)
+    // Double Barline
     final double endX = size.width - hPadding;
-    
-    // Thin line 1
     final thinPaint = Paint()
       ..color = const Color(0xFFB0C4DE).withOpacity(0.6)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
+      ..strokeWidth = 1.2;
     canvas.drawLine(Offset(endX - 5, vPadding), Offset(endX - 5, size.height - vPadding), thinPaint);
 
-    // Thick line (End bar)
     final thickPaint = Paint()
       ..color = const Color(0xFFB0C4DE).withOpacity(0.8)
       ..style = PaintingStyle.stroke
@@ -870,12 +891,6 @@ class StaffLinesPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-
-  static double getLineY(double height, int lineIndex) {
-    final innerHeight = height - (2 * vPadding);
-    final lineSpacing = innerHeight / (numLines - 1);
-    return vPadding + (lineIndex * lineSpacing);
-  }
 }
 
 /// Painter for the long Playhead that can overflow the container
@@ -908,7 +923,7 @@ class PlayheadPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant PlayheadPainter oldDelegate) => oldDelegate.progress != progress;
 }
-/// Painter for Rhythm Notes on the Staff
+/// Painter for drawing Notes and Rests using Noto Music font
 class NotesPainter extends CustomPainter {
   final List<int> pattern;
   final int currentMeasure;
@@ -918,61 +933,58 @@ class NotesPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final double innerWidth = size.width - (2 * hPadding);
-    final double centerY = StaffLinesPainter.getLineY(size.height, 2); // 2nd line
+    double staffHeight = size.height - (StaffLinesPainter.vPadding * 2);
+    double lineSpacing = staffHeight / (StaffLinesPainter.numLines - 1);
+    
+    // Modern notation scale
+    double fontSize = lineSpacing * 4.3; 
+    
+    double measureWidth = size.width - (hPadding * 2);
+    double beatWidth = measureWidth / 4;
 
-    final notePaint = Paint()
-      ..color = const Color(0xFF0E2576)
-      ..style = PaintingStyle.fill;
+    for (int i = 0 ; i < 4; i++) {
+      int absoluteIndex = (currentMeasure * 4) + i;
+      if (absoluteIndex >= pattern.length) break;
 
-    final stemPaint = Paint()
-      ..color = const Color(0xFF0E2576)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
+      bool isNote = pattern[absoluteIndex] == 1;
+      
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: isNote ? '\u{1D15F}' : '\u{1D13D}', // Back to standard Quarter Note
+          style: GoogleFonts.notoMusic(
+            color: const Color(0xFF0E2576),
+            fontSize: fontSize,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      );
+      
+      textPainter.layout();
 
-    int startIndex = currentMeasure * 4;
-    for (int i = 0; i < 4; i++) {
-      int index = startIndex + i;
-      if (index >= pattern.length) break;
+      double x = hPadding + (i * beatWidth) + (beatWidth / 2);
+      double y;
 
-      if (pattern[index] == 1) {
-        // Draw Quarter Note
-        double x = hPadding + (i / 4.0 * innerWidth) + (innerWidth / 8.0); // Center of beat
-        
-        // Note Head (Oval)
-        canvas.drawOval(
-          Rect.fromCenter(center: Offset(x, centerY), width: 14, height: 10),
-          notePaint,
-        );
-
-        // Stem (Upwards)
-        canvas.drawLine(
-          Offset(x + 6, centerY),
-          Offset(x + 6, centerY - 25),
-          stemPaint,
-        );
+      if (isNote) {
+          // Centering Logic for Noto Music Quarter Note (\u1D15F)
+          y = getYForPitch('B4', lineSpacing, StaffLinesPainter.vPadding);
+          
+          canvas.save();
+          // Offset adjustments for centering head of \u1D15F
+          canvas.translate(x - (textPainter.width / 2.1), y - (textPainter.height * 0.77)); 
+          textPainter.paint(canvas, Offset.zero);
+          canvas.restore();
       } else {
-        // Draw Quarter Rest (Simplified)
-        double x = hPadding + (i / 4.0 * innerWidth) + (innerWidth / 8.0);
-        final restPaint = Paint()
-          ..color = const Color(0xFFB0C4DE)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.0;
-        
-        // Simple Z shape for rest
-        canvas.drawPath(
-          Path()
-            ..moveTo(x - 5, centerY - 10)
-            ..lineTo(x + 5, centerY - 5)
-            ..lineTo(x - 5, centerY + 5)
-            ..lineTo(x + 5, centerY + 10),
-          restPaint,
-        );
+          // Quarter Rest center (Line 3 area)
+          y = StaffLinesPainter.vPadding + (2 * lineSpacing);
+          canvas.save();
+          canvas.translate(x - (textPainter.width / 2), y - (textPainter.height * 0.5));
+          textPainter.paint(canvas, Offset.zero);
+          canvas.restore();
       }
     }
   }
 
   @override
   bool shouldRepaint(covariant NotesPainter oldDelegate) => 
-    oldDelegate.currentMeasure != currentMeasure;
+    oldDelegate.pattern != pattern || oldDelegate.currentMeasure != currentMeasure;
 }
