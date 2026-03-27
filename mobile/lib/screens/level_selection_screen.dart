@@ -63,8 +63,8 @@ class LevelSelectionScreen extends StatelessWidget {
                     IconButton(
                       icon: SvgPicture.asset(
                         'assets/icons/back_arrow.svg',
-                        width: 20,
-                        height: 20,
+                        width: 22,
+                        height: 22,
                       ),
                       onPressed: () => Navigator.pop(context),
                     ),
@@ -87,7 +87,7 @@ class LevelSelectionScreen extends StatelessWidget {
               // Level List
               Expanded(
                 child: ListView.builder(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 24),
                   itemCount: levels.length,
                   itemBuilder: (context, index) {
                     return _buildLevelCard(context, levels[index]);
@@ -114,11 +114,12 @@ class LevelSelectionScreen extends StatelessWidget {
               );
             },
       child: Container(
+        height: 60,
         margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         decoration: BoxDecoration(
           color: unlocked ? Colors.white : const Color(0xFFC5CBE4).withAlpha(160),
-          borderRadius: BorderRadius.circular(13),
+          borderRadius: BorderRadius.circular(5),
           boxShadow: unlocked
               ? [
                   const BoxShadow(
@@ -134,6 +135,7 @@ class LevelSelectionScreen extends StatelessWidget {
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
                     level.title,
@@ -195,8 +197,8 @@ class LevelSelectionScreen extends StatelessWidget {
             else
               SvgPicture.asset(
                 'assets/icons/right_arrow.svg',
-                width: 24,
-                height: 24,
+                width: 16,
+                height: 16,
               ),
           ],
         ),

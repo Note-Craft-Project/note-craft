@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:record/record.dart';
@@ -201,38 +202,161 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
   }
 
   void _showMetronomeDialog() {
-    showModalBottomSheet(
+    final TextEditingController controller = TextEditingController(
+      text: ref.read(bpmProvider).toInt().toString(),
+    );
+
+    showDialog(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            final bpm = ref.watch(bpmProvider);
-            return Container(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+      barrierColor: Colors.black.withOpacity(0.3),
+      builder: (context) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(7),
+          ),
+          clipBehavior: Clip.antiAlias,
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 30),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text("BPM Configuration", style: GoogleFonts.ubuntu(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 20),
-                  Slider(
-                    value: bpm,
-                    min: 40,
-                    max: 200,
-                    onChanged: (val) {
-                      ref.read(bpmProvider.notifier).set(val);
-                      setModalState(() {});
-                    },
+                  IconButton(
+                    icon: SvgPicture.asset(
+                      'assets/icons/back_arrow.svg',
+                      width: 24,
+                      height: 24,
+                      colorFilter: const ColorFilter.mode(
+                        Color(0xFF0E2576),
+                        BlendMode.srcIn,
+                      ),
+                    ),
+                    onPressed: () => Navigator.pop(context),
                   ),
-                  Text("${bpm.toInt()} bpm", style: GoogleFonts.ubuntu(fontSize: 16)),
-                  const SizedBox(height: 20),
-                  ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text("Done")),
+                  Expanded(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        "Type Your Metronome",
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.ubuntu(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF0E2576),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 40),
                 ],
               ),
-            );
-          },
-        );
-      },
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 160,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEBEBEB),
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                    child: Center(
+                      child: TextField(
+                        controller: controller,
+                        textAlign: TextAlign.center,
+                        keyboardType: TextInputType.number,
+                        style: GoogleFonts.ubuntu(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF7B9DFE),
+                        ),
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    "bpm",
+                    style: GoogleFonts.ubuntu(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF0E2576),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                "You can only choose between 60-80",
+                style: GoogleFonts.ubuntu(
+                  fontSize: 11,
+                  color: const Color(0xFF7B9DFE).withOpacity(0.8),
+                ),
+              ),
+              const SizedBox(height: 24),
+              _build3DButton(
+                text: "Done",
+                width: 150,
+                height: 46,
+                fontSize: 18,
+                onTap: () {
+                  final double? val = double.tryParse(controller.text);
+                  if (val != null && val >= 60 && val <= 80) {
+                    ref.read(bpmProvider.notifier).set(val);
+                    Navigator.pop(context);
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _build3DButton({
+    required String text,
+    required VoidCallback onTap,
+    double width = double.infinity,
+    double height = 50,
+    double fontSize = 18,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: const Color(0xFF6C9FFD),
+          borderRadius: BorderRadius.circular(7),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0xFF3B71D0),
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Center(
+          child: Text(
+            text,
+            style: GoogleFonts.ubuntu(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: fontSize,
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -273,7 +397,14 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
+                  IconButton(
+                    icon: SvgPicture.asset(
+                      'assets/icons/back_arrow.svg',
+                      width: 22,
+                      height: 22,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                  ),
                   Expanded(child: Text("Rhythm Level 1", textAlign: TextAlign.center, style: GoogleFonts.ubuntu(fontSize: 20, fontWeight: FontWeight.bold))),
                   const SizedBox(width: 48),
                 ],
@@ -295,10 +426,11 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
             const Spacer(),
             Padding(
               padding: const EdgeInsets.all(32),
-              child: ElevatedButton(
-                onPressed: _togglePlay,
-                style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 60), backgroundColor: const Color(0xFF4F8BFB), foregroundColor: Colors.white),
-                child: Text(_gameState == GameState.playing ? "STOP" : "START", style: GoogleFonts.ubuntu(fontSize: 20, fontWeight: FontWeight.bold)),
+              child: _build3DButton(
+                text: _gameState == GameState.playing ? "STOP" : "START",
+                height: 60,
+                fontSize: 20,
+                onTap: _togglePlay,
               ),
             ),
           ],
@@ -346,11 +478,57 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
   }
 
   Widget _buildInputToggle(InputType current) {
-    return ToggleButtons(
-      isSelected: [current == InputType.tap, current == InputType.clap],
-      onPressed: (index) => ref.read(inputTypeProvider.notifier).set(index == 0 ? InputType.tap : InputType.clap),
-      borderRadius: BorderRadius.circular(20),
-      children: const [Icon(Icons.touch_app), Icon(Icons.mic)],
+    bool isClap = current == InputType.clap;
+    return GestureDetector(
+      onTap: () => ref.read(inputTypeProvider.notifier).set(isClap ? InputType.tap : InputType.clap),
+      child: Container(
+        width: 100,
+        height: 38,
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: const Color(0xFF6C9FFD),
+          borderRadius: BorderRadius.circular(19),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF2E6FE9).withOpacity(0.15),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            AnimatedAlign(
+              duration: const Duration(milliseconds: 200),
+              alignment: isClap ? Alignment.centerRight : Alignment.centerLeft,
+              child: Container(
+                width: 30,
+                height: 30,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+            Center(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  right: isClap ? 32 : 0,
+                  left: isClap ? 0 : 32,
+                ),
+                child: Text(
+                  isClap ? "Clap" : "Tap",
+                  style: GoogleFonts.ubuntu(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
