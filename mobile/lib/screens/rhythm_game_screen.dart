@@ -39,11 +39,12 @@ class RhythmGameScreen extends ConsumerStatefulWidget {
   ConsumerState<RhythmGameScreen> createState() => _RhythmGameScreenState();
 }
 
-class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with SingleTickerProviderStateMixin {
+class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with TickerProviderStateMixin {
   late AudioPlayer _audioPlayerHigh;
   late AudioPlayer _audioPlayerLow;
   late AudioRecorder _recorder;
   late AnimationController _animationController;
+  late AnimationController _tapAnimationController;
   StreamSubscription? _amplitudeSubscription;
   Timer? _feedbackTimer;
   Timer? _countdownTimer;
@@ -58,6 +59,8 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
   int _perfectCount = 0;
   final Set<int> _hitNotes = {}; // Track which notes have been hit
   DateTime? _lastClapTriggerTime; // For debouncing clap input
+  double _currentAmplitude = -160.0; // Current decibel level
+  bool _isButtonPressed = false; // For Start/Stop button effect
 
   @override
   void initState() {
@@ -68,6 +71,11 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
     _animationController = AnimationController(vsync: this);
     _animationController.addListener(_onAnimationTick);
     _animationController.addStatusListener(_onAnimationStatus);
+    
+    _tapAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 150),
+    );
     _setupAudio();
   }
 
@@ -160,6 +168,7 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
     _audioPlayerLow.dispose();
     _recorder.dispose();
     _animationController.dispose();
+    _tapAnimationController.dispose();
     _amplitudeSubscription?.cancel();
     super.dispose();
   }
@@ -253,14 +262,16 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
         await _recorder.startStream(const RecordConfig());
         debugPrint("DEBUG: Stream started.");
         
-        _amplitudeSubscription = _recorder.onAmplitudeChanged(const Duration(milliseconds: 50)).listen((amp) {
-          // Use max amplitude for peak detection, and add a small debounce
-          if (amp.max > -25) { 
+        _amplitudeSubscription = _recorder.onAmplitudeChanged(const Duration(milliseconds: 30)).listen((amp) {
+          setState(() {
+            _currentAmplitude = amp.max;
+          });
+          
+          if (amp.max > -32) { // Made more sensitive
             final now = DateTime.now();
-            if (_lastClapTriggerTime == null || now.difference(_lastClapTriggerTime!).inMilliseconds > 200) {
+            if (_lastClapTriggerTime == null || now.difference(_lastClapTriggerTime!).inMilliseconds > 250) {
               _lastClapTriggerTime = now;
-              debugPrint("DEBUG: Clap triggered! Amp: ${amp.max}");
-              _onInputTriggered();
+              _onInputTriggered(); // This starts _tapAnimationController
             }
           }
         });
@@ -279,6 +290,8 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
 
   void _onInputTriggered() {
     if (_gameState != GameState.playing) return;
+    
+    _tapAnimationController.forward(from: 0.0);
 
     final bpm = ref.read(bpmProvider);
     final msPerBeat = 60000.0 / bpm;
@@ -469,19 +482,28 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
     double fontSize = 18,
   }) {
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
+      onTapDown: (_) => setState(() => _isButtonPressed = true),
+      onTapUp: (_) {
+        setState(() => _isButtonPressed = false);
+        onTap();
+      },
+      onTapCancel: () => setState(() => _isButtonPressed = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 60),
         width: width,
         height: height,
+        margin: EdgeInsets.only(top: _isButtonPressed ? 4 : 0),
         decoration: BoxDecoration(
-          color: const Color(0xFF6C9FFD),
-          borderRadius: BorderRadius.circular(7),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0xFF3B71D0),
-              offset: Offset(0, 4),
-            ),
-          ],
+          color: _isButtonPressed ? const Color(0xFF5A8EE0) : const Color(0xFF6C9FFD),
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: _isButtonPressed 
+            ? [] 
+            : [
+                BoxShadow(
+                  color: const Color(0xFF3B71D0),
+                  offset: const Offset(0, 4),
+                ),
+              ],
         ),
         child: Center(
           child: Text(
@@ -617,7 +639,7 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
                       : null,
                   child: Column(
                     children: [
-                      const Spacer(flex: 1), // Reduced to move everything higher
+
 
                       // FEEDBACK & COUNTDOWN AREA
                       SizedBox(
@@ -656,7 +678,7 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
                         ),
                       ),
 
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 40),
 
                       // Area: Staff Music
                       Padding(
@@ -722,26 +744,14 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
                         ),
                       ),
 
-                      // Reserved area for Tap Area Hint
-                      SizedBox(
-                        height: 180,
-                        child: Column(
-                          children: [
-                            const Spacer(),
-                            SizedBox(
-                              height: 100,
-                              child: Center(
-                                child: _gameState == GameState.playing
-                                    ? _buildTapHint(inputType)
-                                    : const SizedBox.shrink(),
-                              ),
-                            ),
-                            const Spacer(),
-                          ],
-                        ),
+                      const SizedBox(height: 20),
+                      // Reserved area for Tap Area Hint (Now Expanded to fill space)
+                      Expanded(
+                        child: _gameState == GameState.playing
+                            ? _buildTapHint(inputType)
+                            : const SizedBox.shrink(),
                       ),
-
-                      const Spacer(flex: 4),
+                      const SizedBox(height: 20),
                     ],
                   ),
                 ),
@@ -767,31 +777,115 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
   }
 
   Widget _buildTapHint(InputType type) {
-    return Column(
-      children: [
-        Container(
-          width: 200,
-          height: 100,
-          decoration: BoxDecoration(
-            gradient: RadialGradient(
-              colors: [
-                const Color(0xFF6C9FFD).withValues(alpha: 0.3),
-                const Color(0xFF6C9FFD).withValues(alpha: 0.0),
+    if (type == InputType.clap) {
+      return _buildClapVisualizer();
+    }
+    
+    return AnimatedBuilder(
+      animation: _tapAnimationController,
+      builder: (context, child) {
+        final t = _tapAnimationController.value;
+        // 1.0 at start, 1.2 at peak
+        double scale = 1.0 + (0.2 * t);
+        // Only visible when triggered (0.0 to 1.0 flash)
+        // If not animating, stay very subtle (0.05) or invisible
+        double opacity = (t > 0) ? (1.0 - t).clamp(0.0, 1.0) : 0.15;
+        
+        return Stack(
+          alignment: Alignment.center,
+          fit: StackFit.expand,
+          clipBehavior: Clip.none,
+          children: [
+            // Pulsing outer glow - Refined radius
+            Container(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  radius: 0.6, // Further reduced to be safe and cleaner
+                  colors: [
+                    const Color(0xFF6C9FFD).withValues(alpha: opacity * 0.4),
+                    const Color(0xFF6C9FFD).withValues(alpha: 0.0),
+                  ],
+                ),
+              ),
+            ),
+            // Inner core with scale effect
+            Transform.scale(
+              scale: scale,
+              child: Container(
+                width: 250,
+                height: 140,
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    radius: 0.5,
+                    colors: [
+                      const Color(0xFF6C9FFD).withValues(alpha: opacity * 0.65),
+                      const Color(0xFF6C9FFD).withValues(alpha: 0.0),
+                    ],
+                  ),
+                ),
+                child: Center(
+                  child: Text(
+                    type == InputType.tap ? "Tap Here" : "Clap Now",
+                    style: GoogleFonts.ubuntu(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF4F8BFB).withValues(alpha: 0.3 + (opacity * 0.7)),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildClapVisualizer() {
+    return AnimatedBuilder(
+      animation: _tapAnimationController,
+      builder: (context, child) {
+        final t = _tapAnimationController.value;
+        double scale = 1.0 + (0.05 * t);
+        
+        return Transform.scale(
+          scale: scale,
+          child: Container(
+            width: 280,
+            height: 90,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(
+                color: t > 0 
+                  ? const Color(0xFF4F8BFB).withValues(alpha: 0.8) 
+                  : const Color(0xFF6C9FFD).withValues(alpha: 0.5),
+                width: t > 0 ? 3 : 2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF6C9FFD).withValues(alpha: t > 0 ? 0.3 : 0.15),
+                  blurRadius: t > 0 ? 25 : 15,
+                  offset: const Offset(0, 5),
+                ),
               ],
             ),
-          ),
-          child: Center(
-            child: Text(
-              type == InputType.tap ? "Tap Here" : "Clap Now",
-              style: GoogleFonts.ubuntu(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF4F8BFB).withValues(alpha: 0.8),
+            child: Center(
+              child: SizedBox(
+                width: 180,
+                height: 48,
+                child: CustomPaint(
+                  painter: VisualizerPainter(
+                    amplitude: _currentAmplitude,
+                    isTriggered: t > 0,
+                    triggerProgress: t,
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 
@@ -1116,4 +1210,60 @@ class NotesPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant NotesPainter oldDelegate) => 
     oldDelegate.pattern != pattern || oldDelegate.currentMeasure != currentMeasure;
+}
+
+class VisualizerPainter extends CustomPainter {
+  final double amplitude;
+  final bool isTriggered;
+  final double triggerProgress;
+  
+  VisualizerPainter({
+    required this.amplitude, 
+    this.isTriggered = false,
+    this.triggerProgress = 0.0,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = isTriggered 
+          ? Color.lerp(const Color(0xFF4F8BFB), const Color(0xFF6C9FFD), triggerProgress)!
+          : const Color(0xFF6C9FFD)
+      ..style = PaintingStyle.fill
+      ..strokeCap = StrokeCap.round;
+
+    final int barCount = 15;
+    final double spacing = size.width / barCount;
+    final double midY = size.height / 2;
+
+    // Normalize amplitude from decibels (-60 to 0 range for visualization) to 0.0 to 1.0
+    double normalized = ((amplitude + 60) / 60).clamp(0.0, 1.0);
+
+    for (int i = 0; i < barCount; i++) {
+      double x = i * spacing + (spacing / 2);
+      
+      // Classic symmetrical visualizer pattern
+      double distanceFromCenter = (i - (barCount / 2)).abs() / (barCount / 2);
+      
+      // Calculate height based on amplitude and distance from center
+      double heightFactor = (1.0 - distanceFromCenter * 0.7) * normalized;
+      double barHeight = size.height * heightFactor;
+
+      if (barHeight < 5) {
+        // Draw as a small dot when silent
+        canvas.drawCircle(Offset(x, midY), 2.5, paint);
+      } else {
+        // Draw as a vertical bar
+        canvas.drawLine(
+          Offset(x, midY - barHeight / 2),
+          Offset(x, midY + barHeight / 2),
+          paint..strokeWidth = 4,
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant VisualizerPainter oldDelegate) => 
+    oldDelegate.amplitude != amplitude || oldDelegate.isTriggered != isTriggered || oldDelegate.triggerProgress != triggerProgress;
 }
