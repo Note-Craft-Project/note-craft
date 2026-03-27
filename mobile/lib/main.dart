@@ -2,9 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'screens/level_selection_screen.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.dark,
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarIconBrightness: Brightness.dark,
+  ));
+  
   runApp(
     const ProviderScope(
       child: NoteCraftApp(),
@@ -99,39 +108,47 @@ class MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBody: true,
-      body: GradientBackground(
-        child: _screens[_selectedIndex],
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light, // for iOS
       ),
-      bottomNavigationBar: Container(
-        height: 78,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.85),
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(13),
-            topRight: Radius.circular(13),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF2E6FE9).withValues(alpha: 0.5),
-              blurRadius: 10,
-              spreadRadius: 1,
-              offset: const Offset(0, -2),
+      child: GradientBackground(
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          extendBody: true,
+          body: _screens[_selectedIndex],
+          bottomNavigationBar: Container(
+            height: 78,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.85),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(13),
+                topRight: Radius.circular(13),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF2E6FE9).withValues(alpha: 0.5),
+                  blurRadius: 10,
+                  spreadRadius: 1,
+                  offset: const Offset(0, -2),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: Row(
-          children: _navItems.asMap().entries.map((entry) {
-            final index = entry.key;
-            final item = entry.value;
-            return _buildNavItem(
-              index,
-              item['activeIcon']!,
-              item['inactiveIcon']!,
-              item['label']!,
-            );
-          }).toList(),
+            child: Row(
+              children: _navItems.asMap().entries.map((entry) {
+                final index = entry.key;
+                final item = entry.value;
+                return _buildNavItem(
+                  index,
+                  item['activeIcon']!,
+                  item['inactiveIcon']!,
+                  item['label']!,
+                );
+              }).toList(),
+            ),
+          ),
         ),
       ),
     );
@@ -236,63 +253,63 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildTopBadge(context, '53', 'assets/icons/level.svg'),
-                _buildTopBadge(context, '2', 'assets/icons/streak.svg'),
-              ],
-            ),
-            const SizedBox(height: 30),
-            Image.asset(
-              'assets/images/logo_app.png',
-              height: 125,
-              fit: BoxFit.contain,
-            ),
-            const SizedBox(height: 40),
-            Row(
-              children: [
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const LevelSelectionScreen(mode: 'Rhythm'),
-                        ),
-                      );
-                    },
-                    child: _buildLessonCard('Rhythm', 'lv1', 0.4, true),
-                  ),
+    final topPadding = MediaQuery.paddingOf(context).top;
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(24, topPadding + 20, 24, 110),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildTopBadge(context, '53', 'assets/icons/level.svg'),
+              _buildTopBadge(context, '2', 'assets/icons/streak.svg'),
+            ],
+          ),
+          const SizedBox(height: 30),
+          Image.asset(
+            'assets/images/logo_app.png',
+            height: 125,
+            fit: BoxFit.contain,
+          ),
+          const SizedBox(height: 40),
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const LevelSelectionScreen(mode: 'Rhythm'),
+                      ),
+                    );
+                  },
+                  child: _buildLessonCard('Rhythm', 'lv1', 0.4, true),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const LevelSelectionScreen(mode: 'Tone'),
-                        ),
-                      );
-                    },
-                    child: _buildLessonCard('Tone', 'lv1', 0.4, true),
-                  ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const LevelSelectionScreen(mode: 'Tone'),
+                      ),
+                    );
+                  },
+                  child: _buildLessonCard('Tone', 'lv1', 0.4, true),
                 ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            _buildLessonCard('Ear Training', 'lv1', 0.1, false),
-            const SizedBox(height: 16),
-            _buildLessonCard('Sight Reading', 'locked', 0.0, false),
-          ],
-        ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          _buildLessonCard('Ear Training', 'lv1', 0.1, false),
+          const SizedBox(height: 16),
+          _buildLessonCard('Sight Reading', 'locked', 0.0, false),
+        ],
       ),
     );
   }

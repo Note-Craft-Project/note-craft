@@ -88,6 +88,9 @@ flutter:
     - assets/images/logo_app.png
     - assets/images/metronome_icon.png
     - assets/icons/
+    - assets/images/gameplay/
+    - assets/images/gameplay/feedback/
+    - assets/audio/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
