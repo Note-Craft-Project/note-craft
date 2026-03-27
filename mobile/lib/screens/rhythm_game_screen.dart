@@ -267,7 +267,7 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Ticker
             _currentAmplitude = amp.max;
           });
           
-          if (amp.max > -32) { // Made more sensitive
+          if (amp.max > -27) { // Re-calibrated to avoid noise floor triggers
             final now = DateTime.now();
             if (_lastClapTriggerTime == null || now.difference(_lastClapTriggerTime!).inMilliseconds > 250) {
               _lastClapTriggerTime = now;
