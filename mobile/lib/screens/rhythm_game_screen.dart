@@ -1066,9 +1066,13 @@ class NotesPainter extends CustomPainter {
 
       bool isNote = noteValue == 1 || noteValue == 2;
       String glyph = '';
-      if (noteValue == 1) glyph = '\u{1D15F}'; // Quarter Note
-      else if (noteValue == 2) glyph = '\u{1D15E}'; // Half Note
-      else glyph = '\u{1D13D}'; // Quarter Rest
+      if (noteValue == 1) {
+        glyph = '\u{1D15F}'; // Quarter Note
+      } else if (noteValue == 2) {
+        glyph = '\u{1D15E}'; // Half Note
+      } else {
+        glyph = '\u{1D13D}'; // Quarter Rest
+      }
       
       final textPainter = TextPainter(
         text: TextSpan(
