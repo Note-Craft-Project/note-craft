@@ -491,7 +491,36 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
                 ),
               ),
 
-              const Spacer(flex: 3),
+              const Spacer(flex: 1), // Reduced to move everything higher
+              
+              // FEEDBACK & ANIMATION STATUS (Fixed space to prevent layout shifts)
+              SizedBox(
+                height: 90, // Reserved height for countdown + spacing
+                child: Center(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    transitionBuilder: (child, animation) {
+                      return ScaleTransition(
+                        scale: animation,
+                        child: FadeTransition(
+                          opacity: animation,
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: _gameState == GameState.countdown
+                        ? SvgPicture.asset(
+                            'assets/images/gameplay/${_countdownValue == 0 ? "START" : _countdownValue.toString()}.svg',
+                            key: ValueKey(_countdownValue),
+                            height: 60, // Adjusted size to better match design
+                            fit: BoxFit.contain,
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                ),
+              ),
+              
+              const SizedBox(height: 10),
 
               // Area: Staff Music (Field Tengah) - Much flatter now
               Padding(
@@ -561,46 +590,48 @@ class _RhythmGameScreenState extends ConsumerState<RhythmGameScreen> with Single
                 ),
               ),
 
-              const Spacer(),
-
-              // FEEDBACK & ANIMATION STATUS
-              if (_gameState == GameState.countdown)
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  transitionBuilder: (child, animation) {
-                    return ScaleTransition(
-                      scale: animation,
-                      child: FadeTransition(
-                        opacity: animation,
-                        child: child,
+              // Reserved area for Feedback & Tap Area Hint to prevent shifting
+              SizedBox(
+                height: 180, // Combined height for feedback + tap hint space
+                child: Column(
+                  children: [
+                    const Spacer(),
+                    // Feedback area
+                    SizedBox(
+                      height: 40,
+                      child: Center(
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 200),
+                          child: _feedbackText.isNotEmpty
+                              ? Text(
+                                  _feedbackText,
+                                  key: ValueKey(_feedbackText),
+                                  style: GoogleFonts.ubuntu(
+                                    fontSize: 30,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green,
+                                  ),
+                                )
+                              : const SizedBox.shrink(),
+                        ),
                       ),
-                    );
-                  },
-                  child: SvgPicture.asset(
-                    'assets/images/gameplay/${_countdownValue == 0 ? "START" : _countdownValue.toString()}.svg',
-                    key: ValueKey(_countdownValue),
-                    height: 80,
-                    fit: BoxFit.contain,
-                  ),
+                    ),
+                    const Spacer(),
+                    // Tap Hint area
+                    SizedBox(
+                      height: 100,
+                      child: Center(
+                        child: _gameState == GameState.playing
+                            ? _buildTapHint(inputType)
+                            : const SizedBox.shrink(),
+                      ),
+                    ),
+                    const Spacer(),
+                  ],
                 ),
-              
-              if (_feedbackText.isNotEmpty)
-                Text(
-                  _feedbackText,
-                  style: GoogleFonts.ubuntu(
-                    fontSize: 30,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green,
-                  ),
-                ),
+              ),
 
-              const Spacer(),
-
-              // Tap Area Hint
-              if (_gameState == GameState.playing)
-                _buildTapHint(inputType),
-
-              const Spacer(flex: 2),
+              const Spacer(flex: 4), // Increased to push elements up
 
               // Bottom Button
               Padding(
