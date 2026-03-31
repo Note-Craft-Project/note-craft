@@ -2,14 +2,14 @@
 
 **Note Craft** adalah platform interaktif modern yang dirancang untuk merevolusi cara belajar musik melalui pendekatan *game-based learning*. Proyek ini terdiri dari aplikasi mobile (Flutter) dan backend server (Elysia + Bun). 
 
-Dikembangkan di bawah naungan **Prasetya Rizky Purnama (PT Bina Talenta Kursus Musik)**, Note Craft hadir sebagai solusi atas tantangan tradisional dalam mempelajari teori musik, menjadikannya lebih menyenangkan, terstruktur, dan mudah diakses oleh siapa saja.
+Dikembangkan di bawah naungan **Prasetya Rizky Purnama (Bina Talenta Kursus Musik)**, Note Craft hadir sebagai solusi atas tantangan tradisional dalam mempelajari teori musik, menjadikannya lebih menyenangkan, terstruktur, dan mudah diakses oleh siapa saja.
 
 ---
 
 ## 🎯 Visi & Misi
 
 - **Visi**: Menjadi platform pendidikan musik terdepan yang membantu jutaan siswa membaca dan memahami musik dengan percaya diri.
-- **Misi**: Mengubah metode pembelajaran musik yang konvensional menjadi pengalaman interaktif yang memotivasi siswa melalui teknologi AI dan umpan balik real-time.
+- **Misi**: Merevolusi metode pembelajaran musik yang konvensional menjadi pengalaman interaktif yang memotivasi siswa melalui teknologi AI dan umpan balik real-time.
 
 ---
 
@@ -37,7 +37,7 @@ Dikembangkan di bawah naungan **Prasetya Rizky Purnama (PT Bina Talenta Kursus M
 
 | Peran | Nama |
 | :--- | :--- |
-| **Owner (PT Bina Talenta)** | **Prasetya Rizky Purnama** |
+| **Owner (Bina Talenta)** | **Prasetya Rizky Purnama** |
 | **UI/UX Designer** | **Ruth Septriana Sipangkar** |
 | **Lead Developer** | **Syafiq Abiyyu Taqi** |
 
